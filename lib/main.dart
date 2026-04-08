@@ -6,6 +6,7 @@ import 'firebase_options.dart';
 import 'providers/app_state.dart';
 import 'screens/app_shell.dart';
 import 'screens/auth_gate.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

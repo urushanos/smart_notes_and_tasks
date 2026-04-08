@@ -23,7 +23,6 @@ class _TaskEditorScreenState extends State<TaskEditorScreen> {
   RepeatType _repeat = RepeatType.once;
   List<int> _repeatDays = [];
   DateTime _start = DateTime.now();
-  DateTime _end = DateTime.now().add(const Duration(days: 1));
   String? _groupId;
 
   @override
@@ -35,7 +34,6 @@ class _TaskEditorScreenState extends State<TaskEditorScreen> {
       _repeat = task.repeatType;
       _repeatDays = [...task.repeatDays];
       _start = task.startDate;
-      _end = task.endDate;
       _groupId = task.groupId;
       for (final step in task.steps) {
         _steps.add(TextEditingController(text: step));
@@ -58,7 +56,14 @@ class _TaskEditorScreenState extends State<TaskEditorScreen> {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final groups = app.groups;
-    _groupId ??= groups.isNotEmpty ? groups.first.id : null;
+    final orderedGroups = [...groups]
+      ..sort((a, b) {
+        final rankA = _groupRank(a.name);
+        final rankB = _groupRank(b.name);
+        if (rankA != rankB) return rankA.compareTo(rankB);
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+    _groupId ??= orderedGroups.isNotEmpty ? orderedGroups.first.id : null;
     return Scaffold(
       appBar: AppBar(title: Text(widget.initialTask == null ? 'Add Task' : 'Edit Task')),
       body: Stack(
@@ -125,19 +130,13 @@ class _TaskEditorScreenState extends State<TaskEditorScreen> {
                 Row(
                   children: [
                     Expanded(child: Text('Start: ${_start.toLocal().toString().split(' ').first}')),
-                    TextButton(onPressed: () => _pickDate(true), child: const Text('Pick')),
-                  ],
-                ),
-                Row(
-                  children: [
-                    Expanded(child: Text('End: ${_end.toLocal().toString().split(' ').first}')),
-                    TextButton(onPressed: () => _pickDate(false), child: const Text('Pick')),
+                    TextButton(onPressed: _pickDate, child: const Text('Pick')),
                   ],
                 ),
                 DropdownButtonFormField<String>(
                   value: _groupId,
                   decoration: const InputDecoration(labelText: 'Group'),
-                  items: groups.map((g) => DropdownMenuItem(value: g.id, child: Text(g.name))).toList(),
+                  items: orderedGroups.map((g) => DropdownMenuItem(value: g.id, child: Text(g.name))).toList(),
                   onChanged: (v) => setState(() => _groupId = v),
                 ),
                 TextButton.icon(
@@ -159,7 +158,7 @@ class _TaskEditorScreenState extends State<TaskEditorScreen> {
                               isCompleted: false,
                               groupId: _groupId!,
                               startDate: _start,
-                              endDate: _end,
+                              endDate: _start,
                               repeatType: _repeat,
                               repeatDays: _repeatDays,
                               completedDate: null,
@@ -169,7 +168,7 @@ class _TaskEditorScreenState extends State<TaskEditorScreen> {
                       steps: _steps.map((s) => s.text.trim()).where((e) => e.isNotEmpty).toList(),
                       groupId: _groupId!,
                       startDate: _start,
-                      endDate: _end,
+                      endDate: _start,
                       repeatType: _repeat,
                       repeatDays: _repeatDays,
                     );
@@ -230,21 +229,24 @@ class _TaskEditorScreenState extends State<TaskEditorScreen> {
     );
   }
 
-  Future<void> _pickDate(bool isStart) async {
+  Future<void> _pickDate() async {
     final selected = await showDatePicker(
       context: context,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
-      initialDate: isStart ? _start : _end,
+      initialDate: _start,
     );
     if (selected == null) return;
     setState(() {
-      if (isStart) {
-        _start = selected;
-      } else {
-        _end = selected;
-      }
+      _start = selected;
     });
+  }
+
+  int _groupRank(String groupName) {
+    final normalized = groupName.trim().toLowerCase();
+    if (normalized == 'dailies') return 0;
+    if (normalized == 'upcoming') return 1;
+    return 2;
   }
 
   Future<void> _showCreateGroup(BuildContext context) async {
@@ -256,16 +258,22 @@ class _TaskEditorScreenState extends State<TaskEditorScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Create Group'),
         content: StatefulBuilder(
-          builder: (context, setInner) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Group name')),
-              const SizedBox(height: 12),
-              ColorPicker(
-                pickerColor: selected,
-                onColorChanged: (c) => setInner(() => selected = c),
-              ),
-            ],
+          builder: (context, setInner) => SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Group name')),
+                const SizedBox(height: 12),
+                ColorPicker(
+                  pickerColor: selected,
+                  onColorChanged: (c) => setInner(() => selected = c),
+                  enableAlpha: false,
+                  showLabel: false,
+                  displayThumbColor: true,
+                  pickerAreaHeightPercent: 0.7,
+                ),
+              ],
+            ),
           ),
         ),
         actions: [
@@ -273,7 +281,10 @@ class _TaskEditorScreenState extends State<TaskEditorScreen> {
           FilledButton(
             onPressed: () async {
               if (nameController.text.trim().isEmpty) return;
-              await app.addGroup(nameController.text.trim(), selected);
+              final group = await app.addGroupAndReturn(nameController.text.trim(), selected);
+              if (group != null && mounted) {
+                setState(() => _groupId = group.id);
+              }
               if (ctx.mounted) Navigator.pop(ctx);
             },
             child: const Text('Create'),

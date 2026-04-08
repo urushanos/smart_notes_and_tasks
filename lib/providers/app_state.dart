@@ -9,12 +9,10 @@ import '../models/task_group.dart';
 import '../models/task_item.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
-import '../services/seed_service.dart';
 
 class AppState extends ChangeNotifier {
   final AuthService _authService = AuthService();
   final FirestoreService _firestoreService = FirestoreService();
-  late final SeedService _seedService = SeedService(_firestoreService);
   final Uuid _uuid = const Uuid();
 
   StreamSubscription<User?>? _authSub;
@@ -63,21 +61,13 @@ class AppState extends ChangeNotifier {
     });
     _groupsSub = _firestoreService.groupsStream(uid).listen((value) async {
       groups = value;
-      await _seedIfNeeded();
       notifyListeners();
     });
     _tasksSub = _firestoreService.tasksStream(uid).listen((value) async {
       tasks = value;
-      await _seedIfNeeded();
       loading = false;
       notifyListeners();
     });
-  }
-
-  Future<void> _seedIfNeeded() async {
-    final user = currentProfile;
-    if (user == null) return;
-    await _seedService.ensureDefaultData(user, groups, tasks);
   }
 
   Future<void> signIn(String email, String password) => _authService.signIn(email: email, password: password);
@@ -96,18 +86,12 @@ class AppState extends ChangeNotifier {
   Future<void> signOut() => _authService.signOut();
 
   Future<void> ensureSeedUser() async {
-    try {
-      await _authService.signIn(email: 'yuvi@mail.com', password: '123456');
-      await _authService.signOut();
-    } catch (_) {
-      try {
-        final cred = await _authService.signUp(email: 'yuvi@mail.com', password: '123456');
-        final profile = AppUser(uid: cred.user!.uid, username: 'yuvi', email: 'yuvi@mail.com');
-        await _firestoreService.saveUser(profile);
-        await _authService.signOut();
-      } catch (_) {
-        // If disabled by backend auth rules, app continues without seed user.
-      }
+    final alreadyInitialized = await _firestoreService.getSeedInitialized();
+    if (!alreadyInitialized) {
+      await _firestoreService.clearCollection('tasks');
+      await _firestoreService.clearCollection('groups');
+      await _firestoreService.clearCollection('users');
+      await _firestoreService.setSeedInitialized(true);
     }
   }
 
@@ -121,6 +105,19 @@ class AppState extends ChangeNotifier {
       colorHex: '#${color.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
     );
     await _firestoreService.addGroup(group);
+  }
+
+  Future<TaskGroup?> addGroupAndReturn(String name, Color color) async {
+    final uid = currentAuthUser?.uid;
+    if (uid == null) return null;
+    final group = TaskGroup(
+      id: _uuid.v4(),
+      name: name,
+      userId: uid,
+      colorHex: '#${color.toARGB32().toRadixString(16).substring(2).toUpperCase()}',
+    );
+    await _firestoreService.addGroup(group);
+    return group;
   }
 
   Future<void> saveTask(TaskItem task) async {
@@ -142,6 +139,16 @@ class AppState extends ChangeNotifier {
         clearCompletedDate: !completed,
       ),
     );
+  }
+
+  Future<void> updateProfilePhotoPath(String? photoPath) async {
+    final profile = currentProfile;
+    if (profile == null) return;
+    final updated = profile.copyWith(
+      photoPath: photoPath,
+      clearPhotoPath: photoPath == null,
+    );
+    await _firestoreService.saveUser(updated);
   }
 
   int get completedCount => tasks.where((t) => t.isCompleted).length;

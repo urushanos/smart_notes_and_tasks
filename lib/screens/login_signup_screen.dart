@@ -14,9 +14,10 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
   final _form = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
-  final _username = TextEditingController(text: 'yuvi');
+  final _username = TextEditingController();
   bool _signup = false;
   bool _busy = false;
+  static final RegExp _specialCharRegex = RegExp(r'[!@#$%^&*(),.?":{}|<>_\-\[\]\\\/+=`~;]');
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +34,7 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(_signup ? 'Create Account' : 'Welcome Back', style: Theme.of(context).textTheme.headlineSmall),
+                    Text(_signup ? 'Create Account' : 'Hello there!', style: Theme.of(context).textTheme.headlineSmall),
                     const SizedBox(height: 16),
                     if (_signup)
                       TextFormField(
@@ -53,7 +54,12 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
                       controller: _password,
                       obscureText: true,
                       decoration: const InputDecoration(labelText: 'Password'),
-                      validator: (v) => (v != null && v.length >= 6) ? null : 'Min 6 chars',
+                      validator: (v) {
+                        final value = v ?? '';
+                        if (value.length < 8) return 'Password must be at least 8 characters';
+                        if (!_specialCharRegex.hasMatch(value)) return 'Password must include 1 special character';
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 16),
                     FilledButton(
@@ -86,8 +92,6 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
                       onPressed: () => setState(() => _signup = !_signup),
                       child: Text(_signup ? 'Have an account? Login' : 'No account? Sign up'),
                     ),
-                    const SizedBox(height: 8),
-                    const Text('Seed user: yuvi@mail.com / 123456'),
                   ],
                 ),
               ),

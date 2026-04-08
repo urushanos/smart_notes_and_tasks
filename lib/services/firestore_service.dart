@@ -10,6 +10,7 @@ class FirestoreService {
   CollectionReference<Map<String, dynamic>> get _users => _firestore.collection('users');
   CollectionReference<Map<String, dynamic>> get _tasks => _firestore.collection('tasks');
   CollectionReference<Map<String, dynamic>> get _groups => _firestore.collection('groups');
+  CollectionReference<Map<String, dynamic>> get _meta => _firestore.collection('app_meta');
 
   Future<void> saveUser(AppUser user) async {
     await _users.doc(user.uid).set(user.toMap(), SetOptions(merge: true));
@@ -43,4 +44,23 @@ class FirestoreService {
   Future<void> updateTask(TaskItem task) => _tasks.doc(task.id).set(task.toMap(), SetOptions(merge: true));
 
   Future<void> deleteTask(String taskId) => _tasks.doc(taskId).delete();
+
+  Future<bool> getSeedInitialized() async {
+    final doc = await _meta.doc('seed_initialized').get();
+    return (doc.data()?['done'] as bool?) ?? false;
+  }
+
+  Future<void> setSeedInitialized(bool done) async {
+    await _meta.doc('seed_initialized').set({'done': done}, SetOptions(merge: true));
+  }
+
+  Future<void> clearCollection(String collection) async {
+    final snapshot = await _firestore.collection(collection).get();
+    if (snapshot.docs.isEmpty) return;
+    final batch = _firestore.batch();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+  }
 }

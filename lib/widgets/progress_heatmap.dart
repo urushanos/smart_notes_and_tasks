@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/date_formatters.dart';
 
 class ProgressHeatmap extends StatelessWidget {
   final Map<DateTime, int> completionLevels;
@@ -20,7 +21,7 @@ class ProgressHeatmap extends StatelessWidget {
           _ => Colors.green.shade700,
         };
         return Tooltip(
-          message: '${d.toLocal().toString().split(' ').first} - Level $level',
+          message: '${formatDateDdMmYyyy(d)} - Level $level',
           child: Container(width: 16, height: 16, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3))),
         );
       }).toList(),

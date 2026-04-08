@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../models/task_group.dart';
 import '../models/task_item.dart';
 import '../providers/app_state.dart';
+import '../utils/date_formatters.dart';
 import 'task_editor_screen.dart';
 
 class TasksScreen extends StatefulWidget {
@@ -15,7 +16,6 @@ class TasksScreen extends StatefulWidget {
 
 class _TasksScreenState extends State<TasksScreen> {
   String _selected = 'Dailies';
-  bool _showCompleted = false;
 
   @override
   Widget build(BuildContext context) {
@@ -29,28 +29,42 @@ class _TasksScreenState extends State<TasksScreen> {
       }
     }
 
-    final now = DateTime.now();
-    final comingSoonDate = now.add(const Duration(days: 14));
+    final today = DateUtils.dateOnly(DateTime.now());
+    TaskGroup? dailiesGroup;
+    TaskGroup? upcomingGroup;
+    for (final group in groups) {
+      final name = group.name.trim().toLowerCase();
+      if (name == 'dailies') dailiesGroup = group;
+      if (name == 'upcoming') upcomingGroup = group;
+    }
 
     final pending = app.tasks.where((t) {
       if (t.isCompleted) return false;
-      if (_selected == 'Upcoming') return t.startDate.isAfter(now);
-      if (_selected == 'Dailies') return true;
+      if (_selected == 'Upcoming') {
+        if (upcomingGroup != null) return t.groupId == upcomingGroup.id;
+        return t.startDate.isAfter(today);
+      }
+      if (_selected == 'Dailies') {
+        if (dailiesGroup != null) return t.groupId == dailiesGroup.id;
+        return true;
+      }
       return selectedGroup != null ? t.groupId == selectedGroup.id : true;
     }).toList()
       ..sort((a, b) => a.endDate.compareTo(b.endDate));
 
-    final completed = app.tasks.where((t) => t.isCompleted).toList();
+    final completed = app.tasks.where((task) {
+      if (!task.isCompleted || task.completedDate == null) return false;
+      if (!DateUtils.isSameDay(task.completedDate, today)) return false;
+      if (_selected == 'Dailies' && dailiesGroup != null) return task.groupId == dailiesGroup.id;
+      if (_selected == 'Upcoming') return upcomingGroup != null ? task.groupId == upcomingGroup.id : false;
+      if (selectedGroup != null) return task.groupId == selectedGroup.id;
+      return true;
+    }).toList()
+      ..sort((a, b) => b.completedDate!.compareTo(a.completedDate!));
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Smart Task Manager'),
-        actions: [
-          IconButton(
-            onPressed: () => app.signOut(),
-            icon: const Icon(Icons.logout),
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TaskEditorScreen())),
@@ -66,37 +80,46 @@ class _TasksScreenState extends State<TasksScreen> {
             items: [
               const DropdownMenuItem(value: 'Dailies', child: Text('Dailies')),
               const DropdownMenuItem(value: 'Upcoming', child: Text('Upcoming')),
-              ...groups.map((g) => DropdownMenuItem(value: g.name, child: Text(g.name))),
+              ...groups
+                  .where((g) => g.name.trim().toLowerCase() != 'dailies' && g.name.trim().toLowerCase() != 'upcoming')
+                  .map((g) => DropdownMenuItem(value: g.name, child: Text(g.name))),
             ],
             onChanged: (v) => setState(() => _selected = v ?? 'Dailies'),
           ),
           if (_selected == 'Upcoming') ...[
             const SizedBox(height: 12),
-            const Text('Coming Soon (next 2 weeks)', style: TextStyle(fontWeight: FontWeight.bold)),
-            ...pending.where((t) => t.startDate.isBefore(comingSoonDate)).map(_tile),
-            const SizedBox(height: 8),
-            const Text('Coming Later', style: TextStyle(fontWeight: FontWeight.bold)),
-            ...pending.where((t) => t.startDate.isAfter(comingSoonDate)).map(_tile),
+            const Text('Upcoming', style: TextStyle(fontWeight: FontWeight.bold)),
+            ...pending.map((task) => _tile(task, groups)),
           ] else ...[
             const SizedBox(height: 12),
             const Text('Pending', style: TextStyle(fontWeight: FontWeight.bold)),
-            ...pending.map(_tile),
+            if (pending.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text("You're done for the day!"),
+              ),
+            ...pending.map((task) => _tile(task, groups)),
           ],
           const SizedBox(height: 8),
-          TextButton(
-            onPressed: () => setState(() => _showCompleted = !_showCompleted),
-            child: Text(_showCompleted ? 'Hide Completed' : 'Show Completed'),
-          ),
-          if (_showCompleted) ...[
+          if (completed.isNotEmpty) ...[
             const Text('Completed', style: TextStyle(fontWeight: FontWeight.bold)),
-            ...completed.map(_tile),
+            ...completed.map((task) => _tile(task, groups)),
           ],
         ],
       ),
     );
   }
 
-  Widget _tile(TaskItem task) {
+  Widget _tile(TaskItem task, List<TaskGroup> groups) {
+    TaskGroup? group;
+    for (final g in groups) {
+      if (g.id == task.groupId) {
+        group = g;
+        break;
+      }
+    }
+    final edgeColor = group?.color ?? Colors.blueGrey;
+
     return Consumer<AppState>(
       builder: (_, app, __) => Card(
         child: ListTile(
@@ -109,7 +132,15 @@ class _TasksScreenState extends State<TasksScreen> {
             task.title,
             style: TextStyle(decoration: task.isCompleted ? TextDecoration.lineThrough : null),
           ),
-          subtitle: Text(task.endDate.toLocal().toString().split(' ').first),
+          subtitle: Text(formatDateDdMmYyyy(task.endDate)),
+          trailing: Container(
+            width: 6,
+            height: 36,
+            decoration: BoxDecoration(
+              color: edgeColor,
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
         ),
       ),
     );
