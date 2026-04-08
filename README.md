@@ -1,16 +1,35 @@
-# smart_notes_and_tasks
+# Smart Task Manager
 
-A new Flutter project.
+Flutter + Firebase task manager with:
+- Email/password authentication
+- Firestore-backed users, groups, and tasks
+- Tasks + Calendar + Profile tabs
+- Task repeats, steps, completion, and edit/delete flow
+- Group color coding and profile analytics (streaks + heatmap)
 
-## Getting Started
+## Tech Stack
+- Flutter
+- Provider state management
+- Firebase Authentication
+- Cloud Firestore
 
-This project is a starting point for a Flutter application.
+## Firestore Collections
+- `users/{uid}`
+- `groups/{groupId}`
+- `tasks/{taskId}`
 
-A few resources to get you started if this is your first Flutter project:
+Each task stores both `userId` and `groupId`.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Setup
+1. Install Flutter and Firebase CLI tools.
+2. Run:
+   - `flutter pub get`
+   - `flutterfire configure`
+3. Replace `lib/firebase_options.dart` with the generated file.
+4. Add Firebase platform files (`google-services.json`, `GoogleService-Info.plist`) as needed.
+5. Run the app.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+For a fresh seed user, default Firestore data includes:
+- Groups: `Dailies`, `Study`
+- Tasks: `Running`, `Coursera`, `Leetcode Practice`
+- Random completed tasks over the last 14 days for heatmap/streak stats.
