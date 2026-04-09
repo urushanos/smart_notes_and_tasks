@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Smart Task Manager
 
 Flutter + Firebase task manager with:
@@ -33,3 +34,5 @@ For a fresh seed user, default Firestore data includes:
 - Groups: `Dailies`, `Study`
 - Tasks: `Running`, `Coursera`, `Leetcode Practice`
 - Random completed tasks over the last 14 days for heatmap/streak stats.
+=======
+>>>>>>> main
