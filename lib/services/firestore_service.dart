@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-<<<<<<< HEAD
 import '../models/app_user.dart';
 import '../models/task_group.dart';
 import '../models/task_item.dart';
@@ -65,16 +64,3 @@ class FirestoreService {
     await batch.commit();
   }
 }
-=======
-class FirestoreService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-
-  Stream<QuerySnapshot> getTasks(String uid) {
-    return _db.collection('users').doc(uid).collection('tasks').snapshots();
-  }
-
-  Future<void> addTask(String uid, Map<String, dynamic> task) async {
-    await _db.collection('users').doc(uid).collection('tasks').add(task);
-  }
-}
->>>>>>> main
